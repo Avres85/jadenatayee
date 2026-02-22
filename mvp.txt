@@ -1,0 +1,200 @@
+Architecture Flipbook MVP v2 (Engineering Checklist)
+
+0. Product Goal
+- [ ] Deliver a PDF flipbook optimized for architectural drawings, plans, and presentation boards.
+- [ ] Prioritize drawing fidelity and readability over decorative realism.
+- [ ] Never introduce a persistent center-gutter dark crease.
+- [ ] Use an all-black application stage/background in normal and fullscreen modes.
+
+1. Scope and Inputs
+- [ ] Support local upload and hosted URL PDF input.
+- [ ] Single-use mode default: admin-only local upload flow for one portfolio owner.
+- [ ] Hard limits: max upload size 70MB, max pages 300, max page dimension 10000px on longest side.
+- [ ] Define target devices: desktop (primary), tablet (secondary), mobile (fallback reading mode).
+- [ ] Browser support matrix: Chrome >= 121, Safari >= 17, Firefox >= 122, Edge >= 121.
+- [ ] MVP includes: open PDF, flip navigation, zoom/pan, page jump, fullscreen, reduced-motion mode.
+
+2. Rendering Architecture
+- [ ] Use PDF.js as core document parser/renderer.
+- [ ] Implement hybrid rendering strategy:
+- [ ] Prefer vector/text layer preservation where possible for line clarity and searchability.
+- [ ] Use raster canvas fallback only when required by performance or compatibility.
+- [ ] Honor PDF page rotation and page boxes (MediaBox/CropBox) to avoid clipped drawings.
+- [ ] Use tiled rendering for high zoom levels to prevent full-page memory spikes.
+- [ ] Keep output color in a consistent sRGB pipeline; do not apply page-tinting filters.
+- [ ] Render current spread at active zoom level; pre-render adjacent pages at lower priority.
+- [ ] Use worker-based rendering to avoid blocking UI thread.
+- [ ] Define cache eviction policy by memory budget, not page count only.
+- [ ] Keep link annotations interactive (internal jumps and external links) when present.
+
+3. Layout and Pagination
+- [ ] Desktop/tablet: two-page spread with correct odd/even pairing.
+- [ ] Mobile: single-page mode by default.
+- [ ] Handle cover/front/back behavior deterministically.
+- [ ] Preserve aspect ratio and avoid cropping drawing content.
+- [ ] Maintain stable layout when rotating device or resizing viewport.
+
+4. Interaction State Machine
+- [ ] Implement explicit states: idle, hover, grabbing, dragging, settling, canceled.
+- [ ] Support mouse, touch, and trackpad gestures.
+- [ ] Support click/tap corner turn, drag turn, and swipe fallback.
+- [ ] Add gesture arbitration rules so pinch-zoom/pan never conflicts with page-flip drag.
+- [ ] Define deterministic flip completion rule:
+- [ ] Distance threshold + velocity threshold + direction validity.
+- [ ] Implement cancel snap-back without state desync.
+- [ ] Block concurrent flips and queue next action safely.
+
+5. Animation and Transition Modes
+- [ ] Primary transition: page-curl flip.
+- [ ] Fallback transition: slide/fade for low-power devices or reduced-motion.
+- [ ] Use requestAnimationFrame for all animation loops.
+- [ ] Keep transform updates compositor-friendly (avoid layout thrash).
+- [ ] Define fixed easing curves and durations for consistency.
+
+6. Center Seam and Artifact Rules (Critical)
+- [ ] No persistent dark center line in idle spread state.
+- [ ] No center seam overlay that obscures linework/text.
+- [ ] During active flip, any temporary shadow must stay on the turning page only.
+- [ ] Prevent 1px seam gaps from subpixel transforms at common DPR values (1.0, 1.5, 2.0, 3.0).
+- [ ] Validate seam quality at 100%, 150%, 200%, and fit-width zoom modes.
+
+7. Visual Direction (Architecture-First)
+- [ ] Use pure black background (`#000000`) for the full viewer stage and surrounding viewport.
+- [ ] Use neutral UI palette and restrained contrast around content.
+- [ ] Remove decorative paper texture and heavy page-thickness theatrics.
+- [ ] Keep shadows subtle and localized; no global vignette or spine darkening.
+- [ ] Do not use gradients or patterned backdrops behind pages.
+- [ ] Use minimal chrome so drawings remain the focal point.
+- [ ] Ensure consistent white balance/background so board colors are not tinted.
+- [ ] Handle transparent PDF regions explicitly: render page backing as white to preserve intended contrast on black stage.
+
+8. Navigation and Reader Controls
+- [ ] Next/previous controls with keyboard support.
+- [ ] Current page / total pages indicator.
+- [ ] Direct page jump input with validation.
+- [ ] Text search (find next/previous) when searchable text layer exists.
+- [ ] Zoom controls: zoom in/out, fit width, fit height, reset to 100%.
+- [ ] Define supported zoom range (e.g., 25% to 800%) and clamp out-of-range input.
+- [ ] Pinch-to-zoom support with inertial pan.
+- [ ] Pan support at zoom > 100%.
+- [ ] Fullscreen toggle.
+
+9. Performance Budgets and SLOs
+- [ ] Define reference test devices (desktop + mobile) before implementation.
+- [ ] SLO: first page visible <= 1.5s (p75) on reference desktop.
+- [ ] SLO: first page visible <= 2.5s (p75) on reference mobile.
+- [ ] SLO: flip interaction input latency <= 50ms (p95).
+- [ ] SLO: animation frame rate >= 60 FPS desktop, >= 40 FPS mobile during flip.
+- [ ] SLO: no long task > 100ms during active interaction (p95).
+- [ ] SLO: memory budget for 100-page test PDF is <= 800MB peak desktop and <= 350MB peak mobile.
+
+10. Quality Degradation Matrix
+- [ ] Tier A (high capability): full curl + subtle dynamic shadows.
+- [ ] Tier B (mid capability): simplified curl + reduced shadow layers.
+- [ ] Tier C (low capability or thermal pressure): slide transition, no curl.
+- [ ] Tier R (prefers-reduced-motion): no curl, minimal transition.
+- [ ] Device tier selection must be deterministic and logged.
+- [ ] Use hysteresis/cooldown to prevent rapid tier flapping during transient load spikes.
+
+11. Accessibility and Inclusive UX
+- [ ] Full keyboard path for navigation, zoom, and fullscreen.
+- [ ] Respect prefers-reduced-motion by default.
+- [ ] Maintain semantic labeling for controls and page status.
+- [ ] Preserve searchable/selectable text whenever source allows.
+- [ ] Ensure visible focus states and adequate contrast in control UI.
+- [ ] Ensure controls remain readable/operable against pure black background.
+- [ ] Provide accessible non-flip reading mode with logical reading order for assistive tech.
+
+12. Reliability and Edge Cases
+- [ ] Gracefully handle corrupt, encrypted, or unsupported PDFs.
+- [ ] Handle very large pages (posters/boards) without crashes.
+- [ ] Handle rapid user input bursts without broken state.
+- [ ] Handle first/last page boundaries cleanly in all modes.
+- [ ] Retry and recover from per-page render failures.
+- [ ] Recover cleanly from temporary network failures for remotely hosted PDFs.
+
+13. Security and Content Handling
+- [ ] Validate MIME type, extension, and file signature.
+- [ ] Enforce upload size/page-count limits server-side and client-side.
+- [ ] Sanitize displayed metadata fields.
+- [ ] Define retention and deletion policy for uploaded PDFs.
+- [ ] Restrict document access with signed URLs or equivalent controls.
+- [ ] Admin-only upload endpoint (token/session protected); no anonymous public uploads in single-use mode.
+- [ ] If hosted URL import is enabled, enforce strict fetch policy:
+- [ ] Allowlist domains only, HTTPS only, max 3 redirects, block private/internal IP ranges, hard timeout, max download bytes 70MB.
+- [ ] Apply simple malware/safety scan on uploaded PDFs before publishing.
+- [ ] Apply upload/job rate limit to prevent accidental queue overload.
+
+14. PDF Compression Pipeline (Pre-Delivery Optimization)
+- [ ] Use direct-to-object-storage multipart upload for large PDFs; avoid buffering full files in a Vercel request.
+- [ ] Persist original upload first (`original.pdf`) before starting optimization.
+- [ ] Trigger asynchronous compression job via queue after upload completes.
+- [ ] Keep upload request fast: API route enqueues job and returns `processing` status immediately.
+- [ ] Run compression in a background worker environment suitable for binary tools and longer execution.
+- [ ] Use idempotency key per upload/job to prevent duplicate compression runs.
+- [ ] Compression pass 1 (safe structural optimization): rewrite object streams, remove unused objects, linearize for faster incremental loading.
+- [ ] Compression pass 2 (conditional image optimization): downsample oversized embedded raster images while preserving readable linework.
+- [ ] Do not rasterize full vector pages as a compression shortcut.
+- [ ] Preserve page geometry, rotation, links, bookmarks, and text-search layer after compression.
+- [ ] Define architecture-safe image rules (example baseline): cap color image DPI to 220-300, keep monochrome drawings lossless where feasible.
+- [ ] Run quality gate before publish with explicit checks:
+- [ ] Text extractability unchanged on sampled pages, no page-count change, and visual diff <= 1.0% non-background pixels at 150 DPI render check.
+- [ ] Run size gate before publish: if compressed file is not meaningfully smaller, keep original as serving asset.
+- [ ] Store both `original.pdf` and `optimized.pdf` with metadata (`source_size`, `optimized_size`, `ratio`, `duration_ms`, `status`).
+- [ ] Serve `optimized.pdf` by default in the viewer; auto-fallback to `original.pdf` on optimization failure.
+- [ ] Expose processing status to user (`uploading`, `processing`, `ready`, `failed`).
+- [ ] Add retry policy with bounded attempts and dead-letter handling for failed compression jobs.
+- [ ] Define compression SLO for large files (example): 70MB source reaches `ready` in <= 90s (p75) on reference conditions.
+- [ ] Garbage-collect orphaned intermediates and stale failed jobs on a daily schedule.
+
+15. Observability
+- [ ] Track timing: open->first-page, page render duration, flip duration.
+- [ ] Track interaction outcomes: flip success/cancel/error rates.
+- [ ] Track quality signals: dropped frames, long tasks, memory warnings.
+- [ ] Track seam/artifact incidents via QA flags.
+- [ ] Track failures by device/browser/PDF characteristics.
+- [ ] Track active degradation tier and tier-switch events.
+- [ ] Track compression pipeline metrics: queue wait, compression duration, compression ratio, failure reason.
+
+16. Test Plan (MVP Gate)
+- [ ] Visual regression tests at key zoom levels and DPRs.
+- [ ] Seam artifact test suite (no dark gutter, no 1px split, no content masking).
+- [ ] Performance test with 100+ page architecture PDF sample set.
+- [ ] State-machine tests for rapid repeated interactions.
+- [ ] Cross-browser validation on target browsers.
+- [ ] Visual tests confirm pure black background in windowed and fullscreen states.
+- [ ] Contrast tests for controls on black background.
+- [ ] 30-minute soak test to catch memory leaks, tier-flapping, and thermal degradation behavior.
+- [ ] Compression validation tests on large portfolios (including 70MB sample): fidelity check + size reduction + processing-time SLO.
+- [ ] Range-request tests confirm partial content delivery (`206`) and fast first-page load from object storage/CDN.
+- [ ] Hosted URL import tests verify redirect/timeout/size/domain/IP policy enforcement.
+
+17. Vercel Deployment and Tech Stack
+- [ ] Framework baseline: Next.js (App Router) deployed on Vercel.
+- [ ] Run PDF rendering on the client; do not server-render PDF pages in Vercel functions.
+- [ ] Serve `pdf.js` worker from static assets with a stable production path.
+- [ ] Use Node.js runtime for upload/import API routes requiring controlled outbound fetch and stream handling.
+- [ ] Do not use Edge runtime for hosted-URL PDF fetching or heavy binary processing.
+- [ ] Store uploaded PDFs in durable object storage (Vercel Blob or S3-compatible storage), never local filesystem.
+- [ ] Ensure object storage delivery supports byte-range requests for PDFs (`Accept-Ranges` / `206 Partial Content`).
+- [ ] Enforce signed access URLs and expiry for private document retrieval.
+- [ ] Define environment variables for storage keys, signing secrets, and allowed import hosts.
+- [ ] Compression stack (single-use friendly): Upstash Redis queue + one containerized worker service (Fly.io/Render/Railway) for Ghostscript/qpdf jobs.
+- [ ] Do not run heavy PDF compression inline in user-facing Vercel request handlers.
+- [ ] Add Vercel preview deployment checks for seam quality, black background, and core navigation flow.
+- [ ] Add production deploy gate that fails if SLO or visual regression checks fail.
+- [ ] Configure cache headers for static assets and worker files to reduce cold-load latency.
+
+18. MVP Acceptance Criteria (Ship/No-Ship)
+- [ ] User can open supported PDF and navigate all pages reliably.
+- [ ] Architecture linework remains readable at center seam and during flips.
+- [ ] No persistent center-gutter dark crease in idle reading state.
+- [ ] Zoom/pan workflow is production-usable for technical drawings.
+- [ ] All defined SLOs pass on reference devices.
+- [ ] Reduced-motion mode is fully functional and on par for navigation.
+- [ ] Viewer stage background is solid black (`#000000`) with no non-content gradients/textures.
+- [ ] Transparent page regions remain legible due to explicit page backing behavior on black stage.
+- [ ] All target browsers in the matrix pass functional and visual gate tests.
+- [ ] Vercel production deployment passes preview/prod gates with no runtime/storage misconfiguration.
+- [ ] Large-upload workflow is production-ready: 70MB PDF can be uploaded, optimized, and served via `optimized.pdf` (or safe fallback) within defined SLO.
+- [ ] PDF delivery supports range requests and does not require full-file download before first interaction.

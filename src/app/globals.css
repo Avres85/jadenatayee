@@ -1,0 +1,214 @@
+:root {
+  --bg: #000000;
+  --surface: #0f0f0f;
+  --surface-soft: #171717;
+  --ink: #f2f2f2;
+  --ink-dim: #a7a7a7;
+  --line: #2a2a2a;
+  --accent: #d4d4d4;
+  --danger: #ff6b6b;
+  --ok: #7ed957;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100%;
+  font-family:
+    "IBM Plex Sans",
+    "Avenir Next",
+    "Segoe UI",
+    sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+.page-shell {
+  min-height: 100vh;
+  background: #000;
+  color: var(--ink);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.7rem 1rem;
+}
+
+.toolbar button,
+.toolbar input {
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--ink);
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.9rem;
+}
+
+.toolbar button:hover {
+  border-color: #3e3e3e;
+}
+
+.toolbar .status {
+  margin-left: auto;
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+}
+
+.viewer-stage {
+  min-height: calc(100vh - 64px);
+  background: #000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.spread {
+  display: grid;
+  gap: 0;
+  background: #000;
+  transform-style: preserve-3d;
+}
+
+.spread.single {
+  grid-template-columns: 1fr;
+}
+
+.spread.double {
+  grid-template-columns: 1fr 1fr;
+}
+
+.page-canvas-wrap {
+  width: min(45vw, 720px);
+  max-width: 100%;
+  aspect-ratio: 0.707;
+  background: #fff;
+  overflow: hidden;
+  position: relative;
+}
+
+.spread.single .page-canvas-wrap {
+  width: min(86vw, 980px);
+}
+
+.page-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.page-empty {
+  width: min(45vw, 720px);
+  aspect-ratio: 0.707;
+  background: #fff;
+}
+
+.flip-next,
+.flip-prev {
+  animation-duration: 280ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+.flip-next {
+  animation-name: flipNext;
+}
+
+.flip-prev {
+  animation-name: flipPrev;
+}
+
+@keyframes flipNext {
+  0% {
+    transform: perspective(1800px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(1800px) rotateY(-8deg);
+  }
+}
+
+@keyframes flipPrev {
+  0% {
+    transform: perspective(1800px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(1800px) rotateY(8deg);
+  }
+}
+
+.panel {
+  margin: 1rem auto;
+  width: min(860px, 95vw);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 1rem;
+}
+
+.panel h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+}
+
+.panel .row {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.panel label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+
+.panel input,
+.panel button {
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--ink);
+  border-radius: 0.4rem;
+  padding: 0.5rem;
+}
+
+.panel button {
+  cursor: pointer;
+}
+
+.mono {
+  font-family:
+    "IBM Plex Mono",
+    "SFMono-Regular",
+    Menlo,
+    monospace;
+  font-size: 0.82rem;
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+@media (max-width: 900px) {
+  .viewer-stage {
+    padding: 0.5rem;
+  }
+}

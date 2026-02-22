@@ -1,0 +1,32 @@
+{
+  "name": "jadenatayee",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "copy-pdf-worker": "node scripts/copy-pdf-worker.mjs",
+    "postinstall": "npm run copy-pdf-worker"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Single-owner architecture flipbook on Next.js",
+  "dependencies": {
+    "next": "^15.5.12",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.3",
+    "eslint-config-next": "^15.5.12",
+    "typescript": "^5.9.3"
+  }
+}
