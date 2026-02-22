@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import HTMLFlipBook from "react-pageflip";
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { EngineFlipState } from "@/components/viewer/flip/types";
+import { useFlipState } from "@/components/viewer/flip/useFlipState";
 
 interface ViewerDocumentPayload {
   id: string;
@@ -22,6 +25,18 @@ interface PdfJsModuleLike {
   GlobalWorkerOptions: {
     workerSrc: string;
   };
+}
+
+type BookMode = "portrait" | "landscape";
+
+interface PageFlipApi {
+  flipNext: (corner?: "top" | "bottom") => void;
+  flipPrev: (corner?: "top" | "bottom") => void;
+  flip: (pageNumber: number, corner?: "top" | "bottom") => void;
+}
+
+interface FlipBookRefLike {
+  pageFlip: () => PageFlipApi;
 }
 
 function ensurePromiseWithResolvers(): void {
@@ -68,19 +83,6 @@ function usePrefersReducedMotion(): boolean {
     return () => media.removeEventListener("change", handler);
   }, []);
   return value;
-}
-
-function useSpreadMode(): boolean {
-  const [spread, setSpread] = useState(true);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const media = window.matchMedia("(min-width: 900px)");
-    setSpread(media.matches);
-    const listener = () => setSpread(media.matches);
-    media.addEventListener("change", listener);
-    return () => media.removeEventListener("change", listener);
-  }, []);
-  return spread;
 }
 
 function bytesToLabel(bytes: number): string {
@@ -174,6 +176,21 @@ function PageCanvas({
   );
 }
 
+const FlipPage = forwardRef<
+  HTMLDivElement,
+  {
+    pdf: PDFDocumentLike;
+    pageNumber: number;
+    zoom: number;
+  }
+>(function FlipPage({ pdf, pageNumber, zoom }, ref) {
+  return (
+    <div ref={ref} className="flipbook-page">
+      <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
+    </div>
+  );
+});
+
 export function FlipbookViewer() {
   const [meta, setMeta] = useState<ViewerDocumentPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -182,10 +199,12 @@ export function FlipbookViewer() {
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpValue, setJumpValue] = useState("1");
   const [zoom, setZoom] = useState(1);
-  const [transitionClass, setTransitionClass] = useState("");
-  const spreadMode = useSpreadMode();
+  const [bookMode, setBookMode] = useState<BookMode>("landscape");
   const reducedMotion = usePrefersReducedMotion();
   const pdfJsRef = useRef<PdfJsModuleLike | null>(null);
+  const bookRef = useRef<FlipBookRefLike | null>(null);
+  const { snapshot: flipSnapshot, reset: resetFlipState, handleEngineState, requestProgrammaticTurn } =
+    useFlipState();
 
   useEffect(() => {
     let disposed = false;
@@ -228,6 +247,7 @@ export function FlipbookViewer() {
           }
           return loaded;
         });
+        resetFlipState();
         setCurrentPage(1);
         setJumpValue("1");
       } catch (reason) {
@@ -245,78 +265,102 @@ export function FlipbookViewer() {
     return () => {
       disposed = true;
     };
-  }, []);
+  }, [resetFlipState]);
 
-  useEffect(() => {
-    if (!pdfDoc) return;
-    const maxStart = spreadMode ? Math.max(1, pdfDoc.numPages - 1) : pdfDoc.numPages;
-    setCurrentPage((previous) => {
-      let next = Math.min(previous, maxStart);
-      if (spreadMode && next % 2 === 0) {
-        next -= 1;
-      }
-      return Math.max(next, 1);
-    });
-  }, [spreadMode, pdfDoc]);
-
-  const visiblePages = useMemo(() => {
+  const allPages = useMemo(() => {
     if (!pdfDoc) return [];
-    if (!spreadMode) {
-      return [currentPage];
-    }
-    const right = currentPage + 1 <= pdfDoc.numPages ? currentPage + 1 : null;
-    return [currentPage, right].filter((value): value is number => Boolean(value));
-  }, [currentPage, pdfDoc, spreadMode]);
+    return Array.from({ length: pdfDoc.numPages }, (_value, index) => index + 1);
+  }, [pdfDoc]);
 
-  function withFlipAnimation(direction: "next" | "prev", update: () => void): void {
-    if (reducedMotion) {
-      update();
+  const onFlip = useCallback((event: { data?: number }) => {
+    const nextPage = Number(event?.data ?? 0) + 1;
+    if (!Number.isFinite(nextPage) || nextPage < 1) {
       return;
     }
-    setTransitionClass(direction === "next" ? "flip-next" : "flip-prev");
-    update();
-    window.setTimeout(() => setTransitionClass(""), 280);
-  }
+    setCurrentPage(nextPage);
+    setJumpValue(String(nextPage));
+  }, []);
+
+  const onBookInit = useCallback((event: { data?: { page?: number; mode?: BookMode } }) => {
+    resetFlipState();
+    const pageIndex = Number(event?.data?.page ?? 0);
+    const nextPage = Number.isFinite(pageIndex) ? pageIndex + 1 : 1;
+    setCurrentPage(Math.max(1, nextPage));
+    setJumpValue(String(Math.max(1, nextPage)));
+    if (event?.data?.mode) {
+      setBookMode(event.data.mode);
+    }
+  }, [resetFlipState]);
+
+  const onChangeOrientation = useCallback((event: { data?: BookMode }) => {
+    if (event?.data === "portrait" || event?.data === "landscape") {
+      setBookMode(event.data);
+    }
+  }, []);
+
+  const onChangeState = useCallback(
+    (event: { data?: unknown }) => {
+      const state = event?.data;
+      if (
+        state === "user_fold" ||
+        state === "fold_corner" ||
+        state === "flipping" ||
+        state === "read"
+      ) {
+        handleEngineState(state as EngineFlipState);
+      }
+    },
+    [handleEngineState],
+  );
+
+  const requestBookTurn = useCallback(
+    (turn: (api: PageFlipApi) => void, fallback: () => void) => {
+      const pageFlip = bookRef.current?.pageFlip?.();
+      if (!pageFlip) {
+        fallback();
+        return;
+      }
+      requestProgrammaticTurn(() => turn(pageFlip));
+    },
+    [requestProgrammaticTurn],
+  );
 
   function goNext(): void {
     if (!pdfDoc) return;
-    const step = spreadMode ? 2 : 1;
-    const maxStart = spreadMode ? Math.max(1, pdfDoc.numPages - 1) : pdfDoc.numPages;
-    withFlipAnimation("next", () => {
-      setCurrentPage((previous) => {
-        const next = Math.min(previous + step, maxStart);
+    requestBookTurn(
+      (pageFlip) => pageFlip.flipNext("top"),
+      () => {
+        const next = Math.min(currentPage + 1, pdfDoc.numPages);
+        setCurrentPage(next);
         setJumpValue(String(next));
-        return next;
-      });
-    });
+      },
+    );
   }
 
   function goPrev(): void {
     if (!pdfDoc) return;
-    const step = spreadMode ? 2 : 1;
-    withFlipAnimation("prev", () => {
-      setCurrentPage((previous) => {
-        let next = Math.max(1, previous - step);
-        if (spreadMode && next % 2 === 0) {
-          next -= 1;
-        }
-        next = Math.max(next, 1);
+    requestBookTurn(
+      (pageFlip) => pageFlip.flipPrev("top"),
+      () => {
+        const next = Math.max(1, currentPage - 1);
+        setCurrentPage(next);
         setJumpValue(String(next));
-        return next;
-      });
-    });
+      },
+    );
   }
 
   function jumpToPage(): void {
     if (!pdfDoc) return;
     const parsed = Number.parseInt(jumpValue, 10);
     if (Number.isNaN(parsed)) return;
-    let page = Math.max(1, Math.min(parsed, pdfDoc.numPages));
-    if (spreadMode && page % 2 === 0) {
-      page -= 1;
-    }
-    setCurrentPage(Math.max(page, 1));
-    setJumpValue(String(Math.max(page, 1)));
+    const page = Math.max(1, Math.min(parsed, pdfDoc.numPages));
+    requestBookTurn(
+      (pageFlip) => pageFlip.flip(page - 1, "top"),
+      () => {
+        setCurrentPage(page);
+        setJumpValue(String(page));
+      },
+    );
   }
 
   async function toggleFullscreen(): Promise<void> {
@@ -355,20 +399,21 @@ export function FlipbookViewer() {
   return (
     <main className="page-shell">
       <div className="toolbar">
-        <button type="button" onClick={goPrev}>
+        <button type="button" onClick={goPrev} disabled={flipSnapshot.locked}>
           Prev
         </button>
-        <button type="button" onClick={goNext}>
+        <button type="button" onClick={goNext} disabled={flipSnapshot.locked}>
           Next
         </button>
         <input
           value={jumpValue}
           onChange={(event) => setJumpValue(event.target.value)}
           onBlur={jumpToPage}
+          disabled={flipSnapshot.locked}
           style={{ width: "4.4rem" }}
           aria-label="Jump to page"
         />
-        <button type="button" onClick={jumpToPage}>
+        <button type="button" onClick={jumpToPage} disabled={flipSnapshot.locked}>
           Jump
         </button>
         <button type="button" onClick={() => setZoom((value) => Math.max(0.25, value - 0.1))}>
@@ -385,17 +430,49 @@ export function FlipbookViewer() {
           Fullscreen
         </button>
         <div className="status mono">
-          {currentPage}/{pdfDoc.numPages} • {spreadMode ? "Spread" : "Single"} •{" "}
-          {bytesToLabel(meta.fileSize)}
+          {currentPage}/{pdfDoc.numPages} • {bookMode === "landscape" ? "Spread" : "Single"} •{" "}
+          {bytesToLabel(meta.fileSize)} • {flipSnapshot.phase}
+          {flipSnapshot.hasPendingTurn ? " • queued" : ""}
         </div>
       </div>
 
       <section className="viewer-stage" aria-live="polite">
-        <div className={`spread ${spreadMode ? "double" : "single"} ${transitionClass}`.trim()}>
-          {visiblePages.map((page) => (
-            <PageCanvas key={page} pdf={pdfDoc} pageNumber={page} zoom={zoom} />
-          ))}
-          {spreadMode && visiblePages.length === 1 ? <div className="page-empty" /> : null}
+        <div className="flipbook-shell">
+          <HTMLFlipBook
+            ref={bookRef}
+            width={720}
+            height={1018}
+            size="stretch"
+            minWidth={260}
+            maxWidth={980}
+            minHeight={360}
+            maxHeight={1385}
+            drawShadow={!reducedMotion}
+            flippingTime={reducedMotion ? 300 : 900}
+            usePortrait
+            startPage={0}
+            startZIndex={1}
+            autoSize
+            maxShadowOpacity={0.35}
+            showCover={false}
+            mobileScrollSupport
+            clickEventForward
+            useMouseEvents
+            swipeDistance={30}
+            showPageCorners
+            disableFlipByClick={false}
+            className="flipbook"
+            style={{}}
+            renderOnlyPageLengthChange
+            onFlip={onFlip}
+            onInit={onBookInit}
+            onChangeOrientation={onChangeOrientation}
+            onChangeState={onChangeState}
+          >
+            {allPages.map((page) => (
+              <FlipPage key={page} pdf={pdfDoc} pageNumber={page} zoom={zoom} />
+            ))}
+          </HTMLFlipBook>
         </div>
       </section>
 

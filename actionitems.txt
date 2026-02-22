@@ -1,0 +1,149 @@
+Action Items: Realistic Page Flip + Touch Gestures (Single Static PDF)
+
+Scope lock (important)
+- Project supports one static portfolio PDF only (~10MB).
+- No upload pipeline, no multi-document library, no dynamic source switching.
+- Use StPageFlip path only.
+- Drop all custom flip-engine/mounting tracks.
+
+Checklist
+1. Architecture and scope
+- [x] Lock engine to StPageFlip (no custom implementation branch).
+- [x] Keep current static source model (`public/portfolio-compressed.pdf` + `/api/viewer/document`).
+- [x] Keep existing toolbar controls (Prev/Next, Jump, Zoom, Fullscreen).
+
+2. Flip realism core
+- [ ] Replace current CSS spread animation (`flip-next`/`flip-prev`) with real page curl interactions.
+- [ ] Enable corner grab, drag-follow, and release-to-complete.
+- [ ] Implement drop cancel + snap-back animation when thresholds are not met.
+- [ ] Ensure page turn is page-level (not whole spread transform).
+
+3. Touch and gesture behavior
+- [ ] Add robust touch/pointer handling for mobile and tablet.
+- [ ] Support swipe fallback for quick next/prev.
+- [ ] Add gesture arbitration so pinch/pan does not trigger flip.
+- [ ] Prioritize pan when zoom > 100%; require explicit corner grab to flip.
+
+4. Rendering and smoothness
+- [ ] Integrate PDF page render output cleanly with the flipbook view.
+- [ ] Preload adjacent pages for smoother turns.
+- [ ] Keep white page backing for transparent PDF content.
+- [ ] Preserve odd/even spread pairing consistency.
+
+5. Reliability and fallback
+- [ ] Handle pointer cancel/interruption without stuck flip states.
+- [ ] Block concurrent flips and prevent page index desync.
+- [ ] Respect reduced-motion with simplified transition fallback.
+- [ ] Keep black stage and no persistent center crease at rest.
+
+6. QA gates
+- [ ] Test desktop: Chrome, Safari, Firefox.
+- [ ] Test mobile touch: iOS Safari, Android Chrome.
+- [ ] Validate grab/drag/drop realism and snap-back behavior.
+- [ ] Validate zoom+pan+flip arbitration under fast repeated input.
+
+2-Week Ticket Plan (trimmed for single static PDF)
+
+Week 1
+
+Ticket FB-001 (Day 1): StPageFlip integration scaffold [Completed on February 22, 2026]
+- Files: `src/components/viewer/FlipbookViewer.tsx`, `package.json`
+- Tasks:
+  - Add and wire StPageFlip to viewer shell.
+  - Keep static document load path unchanged.
+- Done when:
+  - `/viewer` loads the same PDF and flipbook container renders.
+
+Ticket FB-002 (Day 1): Flip state and turn locking [Completed on February 22, 2026]
+- Files: `src/components/viewer/flip/useFlipState.ts`, `src/components/viewer/flip/types.ts`
+- Tasks:
+  - Define turn lifecycle states and single-turn lock.
+  - Prevent concurrent page turns.
+- Done when:
+  - Rapid input cannot corrupt page order.
+
+Ticket FB-003 (Day 2): Replace fake CSS flip
+- Files: `src/components/viewer/FlipbookViewer.tsx`, `src/app/globals.css`
+- Tasks:
+  - Remove `flip-next` / `flip-prev` transitions.
+  - Use real page curl interactions from engine.
+- Done when:
+  - Page turn is realistic and drag-reactive.
+
+Ticket FB-004 (Day 2): Grab + drag + drop thresholds
+- Files: `src/components/viewer/flip/useFlipGestures.ts`, `src/components/viewer/flip/flipRules.ts`
+- Tasks:
+  - Corner grab zones.
+  - Completion vs cancel thresholds.
+  - Snap-back on cancel.
+- Done when:
+  - User can grab, drag, and release with deterministic outcomes.
+
+Ticket FB-005 (Day 3): Touch gesture arbitration
+- Files: `src/components/viewer/flip/useGestureArbiter.ts`, `src/app/globals.css`
+- Tasks:
+  - Separate flip from pinch/pan.
+  - Add touch-action rules.
+- Done when:
+  - Pinch/pan never accidentally flips.
+
+Ticket FB-006 (Day 4): Zoomed pan behavior
+- Files: `src/components/viewer/FlipbookViewer.tsx`, `src/components/viewer/flip/useGestureArbiter.ts`
+- Tasks:
+  - At zoom > 1, prioritize panning over flipping.
+  - Require explicit corner intent for turn start.
+- Done when:
+  - Drawing inspection is stable at high zoom.
+
+Ticket FB-007 (Day 5): Adjacent page preloading
+- Files: `src/components/viewer/flip/usePageRenderQueue.ts`, `src/components/viewer/FlipbookViewer.tsx`
+- Tasks:
+  - Pre-render neighboring pages for smoother turns.
+- Done when:
+  - Fewer visible blank frames during fast flips.
+
+Week 2
+
+Ticket FB-008 (Day 1): Reduced-motion and low-power fallback
+- Files: `src/components/viewer/FlipbookViewer.tsx`, `src/components/viewer/flip/usePerformanceTier.ts`
+- Tasks:
+  - Keep non-curl fallback when reduced motion is enabled.
+  - Add simplified mode if device struggles.
+- Done when:
+  - Functionality remains intact across device classes.
+
+Ticket FB-009 (Day 2): Reliability hardening
+- Files: `src/components/viewer/flip/useFlipGestures.ts`, `src/components/viewer/flip/useFlipState.ts`
+- Tasks:
+  - Handle pointer cancel, tab switch interruption, fullscreen transitions.
+- Done when:
+  - No stuck interaction state after interruption.
+
+Ticket FB-010 (Day 3): Accessibility and keyboard parity
+- Files: `src/components/viewer/FlipbookViewer.tsx`, `src/app/globals.css`
+- Tasks:
+  - Keep keyboard next/prev and focus-visible states.
+  - Ensure controls remain usable with new engine.
+- Done when:
+  - Keyboard-only flow still works.
+
+Ticket FB-011 (Day 4): Cross-browser validation
+- Files: `actionitems.txt` (this file), `README.md`
+- Tasks:
+  - Validate desktop + mobile target matrix.
+  - Record pass/fail and known quirks.
+- Done when:
+  - All critical flip + gesture scenarios pass.
+
+Ticket FB-012 (Day 5): Final cleanup and docs
+- Files: `howitworks.md`, `README.md`
+- Tasks:
+  - Update docs to reflect realistic flip architecture.
+  - Document limitations for static single-PDF mode.
+- Done when:
+  - Documentation matches shipped behavior.
+
+Immediate next tickets
+1. FB-001
+2. FB-002
+3. FB-003
