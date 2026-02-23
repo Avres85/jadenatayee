@@ -167,8 +167,8 @@ a {
   display: block;
   z-index: 4;
   pointer-events: none;
-  backface-visibility: visible !important;
-  -webkit-backface-visibility: visible !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
   transform: translateZ(0.12px);
   -webkit-transform: translateZ(0.12px);
   will-change: transform, opacity;
@@ -194,6 +194,10 @@ a {
 .flipbook-page.double-sided-cover .cover-side .page-canvas-wrap {
   position: relative;
   z-index: 2;
+}
+
+.flipbook-page.double-sided-cover .cover-side.has-cover-overlay .page-canvas-wrap {
+  opacity: 0;
 }
 
 /* Remove visible center seam by slightly overlapping spread pages. */

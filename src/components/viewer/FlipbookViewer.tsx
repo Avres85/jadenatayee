@@ -261,7 +261,7 @@ const FlipPage = forwardRef<
   if (doubleSided) {
     return (
       <div ref={ref} className={`flipbook-page double-sided-cover${className ? ` ${className}` : ""}`}>
-        <div className="cover-side cover-side-front">
+        <div className={`cover-side cover-side-front${isFrontCover && coverTexture ? " has-cover-overlay" : ""}`}>
           <PageCanvas
             pdf={pdf}
             pageNumber={pageNumber}
@@ -278,7 +278,10 @@ const FlipPage = forwardRef<
             />
           ) : null}
         </div>
-        <div className="cover-side cover-side-back" aria-hidden="true">
+        <div
+          className={`cover-side cover-side-back${isFrontCover && coverTexture ? " has-cover-overlay" : ""}`}
+          aria-hidden="true"
+        >
           <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
           {isFrontCover && coverTexture ? (
             <img
@@ -417,7 +420,8 @@ export function FlipbookViewer() {
   }, []);
 
   const setCoverTexture = useCallback((dataUrl: string) => {
-    setFrontCoverTexture((current) => (current === dataUrl ? current : dataUrl));
+    // Freeze first valid texture to avoid Safari compositing flicker from repeated updates.
+    setFrontCoverTexture((current) => (current ? current : dataUrl));
   }, []);
 
   const onBookInit = useCallback((event: { data?: { page?: number; mode?: BookMode } }) => {
@@ -594,10 +598,10 @@ export function FlipbookViewer() {
   const coverReadyForTurn = currentPage !== 1 || frontCoverTexture !== null;
   const canGoPrev = !flipSnapshot.locked && currentPage > 1;
   const canGoNext = !flipSnapshot.locked && currentPage < pdfDoc.numPages && coverReadyForTurn;
-  const bookWidth = isDesktop ? (isSafari ? 378 : 420) : 620;
-  const bookHeight = isDesktop ? (isSafari ? 535 : 594) : 877;
-  const bookMaxWidth = isDesktop ? (isSafari ? 504 : 560) : 820;
-  const bookMaxHeight = isDesktop ? (isSafari ? 711 : 790) : 1160;
+  const bookWidth = isDesktop ? (isSafari ? 472 : 420) : 620;
+  const bookHeight = isDesktop ? (isSafari ? 669 : 594) : 877;
+  const bookMaxWidth = isDesktop ? (isSafari ? 630 : 560) : 820;
+  const bookMaxHeight = isDesktop ? (isSafari ? 889 : 790) : 1160;
 
   return (
     <main className="page-shell viewer-shell">
