@@ -265,7 +265,7 @@ export function FlipbookViewer() {
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentLike | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpValue, setJumpValue] = useState("1");
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.5);
   const [bookMode, setBookMode] = useState<BookMode>("landscape");
   const [frontCoverTexture, setFrontCoverTexture] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
@@ -574,8 +574,8 @@ export function FlipbookViewer() {
         <button type="button" onClick={() => setZoom((value) => Math.min(8, value + 0.1))}>
           +
         </button>
-        <button type="button" onClick={() => setZoom(1)}>
-          100%
+        <button type="button" onClick={() => setZoom(0.5)}>
+          50%
         </button>
         <button type="button" onClick={toggleFullscreen}>
           Fullscreen
