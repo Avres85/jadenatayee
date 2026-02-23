@@ -154,17 +154,24 @@ a {
   -webkit-transform-style: preserve-3d;
   opacity: 1;
   overflow: hidden;
+  background: #fff;
+  will-change: transform;
 }
 
-.flipbook-page.double-sided-cover .cover-texture {
+.flipbook-page.double-sided-cover .cover-texture-overlay {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  z-index: 4;
+  pointer-events: none;
   backface-visibility: visible !important;
   -webkit-backface-visibility: visible !important;
   transform: translateZ(0.12px);
   -webkit-transform: translateZ(0.12px);
+  will-change: transform, opacity;
 }
 
 .flipbook-page.double-sided-cover .cover-side-front {
@@ -187,6 +194,19 @@ a {
 .flipbook-page.double-sided-cover .cover-side .page-canvas-wrap {
   position: relative;
   z-index: 2;
+}
+
+/* Remove visible center seam by slightly overlapping spread pages. */
+.flipbook-shell .stf__item.--left .flipbook-page {
+  margin-right: -1px;
+}
+
+.flipbook-shell .stf__item.--right .flipbook-page {
+  margin-left: -1px;
+}
+
+.flipbook-shell .stf__item {
+  box-shadow: none !important;
 }
 
 .page-canvas-wrap {

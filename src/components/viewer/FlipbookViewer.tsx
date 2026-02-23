@@ -124,6 +124,23 @@ function useIsDesktop(breakpoint = 1024): boolean {
   return isDesktop;
 }
 
+function useIsSafari(): boolean {
+  const [isSafari, setIsSafari] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const ua = navigator.userAgent;
+    const vendor = navigator.vendor ?? "";
+    const safari =
+      /Safari/i.test(ua) &&
+      /Apple/i.test(vendor) &&
+      !/CriOS|Chrome|Chromium|Edg|OPR|FxiOS|Firefox|SamsungBrowser/i.test(ua);
+    setIsSafari(safari);
+  }, []);
+
+  return isSafari;
+}
+
 function bytesToLabel(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -245,23 +262,33 @@ const FlipPage = forwardRef<
     return (
       <div ref={ref} className={`flipbook-page double-sided-cover${className ? ` ${className}` : ""}`}>
         <div className="cover-side cover-side-front">
+          <PageCanvas
+            pdf={pdf}
+            pageNumber={pageNumber}
+            zoom={zoom}
+            onBitmap={isFrontCover ? onCoverBitmap : undefined}
+          />
           {isFrontCover && coverTexture ? (
-            <img src={coverTexture} alt="" aria-hidden="true" className="cover-texture" draggable={false} />
-          ) : (
-            <PageCanvas
-              pdf={pdf}
-              pageNumber={pageNumber}
-              zoom={zoom}
-              onBitmap={isFrontCover ? onCoverBitmap : undefined}
+            <img
+              src={coverTexture}
+              alt=""
+              aria-hidden="true"
+              className="cover-texture-overlay"
+              draggable={false}
             />
-          )}
+          ) : null}
         </div>
         <div className="cover-side cover-side-back" aria-hidden="true">
+          <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
           {isFrontCover && coverTexture ? (
-            <img src={coverTexture} alt="" aria-hidden="true" className="cover-texture" draggable={false} />
-          ) : (
-            <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
-          )}
+            <img
+              src={coverTexture}
+              alt=""
+              aria-hidden="true"
+              className="cover-texture-overlay"
+              draggable={false}
+            />
+          ) : null}
         </div>
       </div>
     );
@@ -286,6 +313,7 @@ export function FlipbookViewer() {
   const [frontCoverTexture, setFrontCoverTexture] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const isDesktop = useIsDesktop(1024);
+  const isSafari = useIsSafari();
   const pdfJsRef = useRef<PdfJsModuleLike | null>(null);
   const bookRef = useRef<FlipBookRefLike | null>(null);
   const { snapshot: flipSnapshot, reset: resetFlipState, handleEngineState, requestProgrammaticTurn } =
@@ -566,10 +594,10 @@ export function FlipbookViewer() {
   const coverReadyForTurn = currentPage !== 1 || frontCoverTexture !== null;
   const canGoPrev = !flipSnapshot.locked && currentPage > 1;
   const canGoNext = !flipSnapshot.locked && currentPage < pdfDoc.numPages && coverReadyForTurn;
-  const bookWidth = isDesktop ? 420 : 620;
-  const bookHeight = isDesktop ? 594 : 877;
-  const bookMaxWidth = isDesktop ? 560 : 820;
-  const bookMaxHeight = isDesktop ? 790 : 1160;
+  const bookWidth = isDesktop ? (isSafari ? 378 : 420) : 620;
+  const bookHeight = isDesktop ? (isSafari ? 535 : 594) : 877;
+  const bookMaxWidth = isDesktop ? (isSafari ? 504 : 560) : 820;
+  const bookMaxHeight = isDesktop ? (isSafari ? 711 : 790) : 1160;
 
   return (
     <main className="page-shell viewer-shell">
