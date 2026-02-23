@@ -423,6 +423,7 @@ export function FlipbookViewer() {
 
   function goNext(): void {
     if (!pdfDoc) return;
+    if (currentPage === 1 && frontCoverTexture === null) return;
     const pageFlip = bookRef.current?.pageFlip?.();
     if (pageFlip) {
       const index = pageFlip.getCurrentPageIndex();
@@ -468,6 +469,7 @@ export function FlipbookViewer() {
     const parsed = Number.parseInt(jumpValue, 10);
     if (Number.isNaN(parsed)) return;
     const page = Math.max(1, Math.min(parsed, pdfDoc.numPages));
+    if (currentPage === 1 && page > 1 && frontCoverTexture === null) return;
     requestBookTurn(
       (pageFlip) => pageFlip.flip(page - 1, "top"),
       () => {
@@ -544,8 +546,9 @@ export function FlipbookViewer() {
 
   const isFrontCoverCentered =
     bookMode === "landscape" && currentPage === 1 && flipSnapshot.phase === "idle";
+  const coverReadyForTurn = currentPage !== 1 || frontCoverTexture !== null;
   const canGoPrev = !flipSnapshot.locked && currentPage > 1;
-  const canGoNext = !flipSnapshot.locked && currentPage < pdfDoc.numPages;
+  const canGoNext = !flipSnapshot.locked && currentPage < pdfDoc.numPages && coverReadyForTurn;
 
   return (
     <main className="page-shell viewer-shell">
@@ -594,13 +597,13 @@ export function FlipbookViewer() {
         >
           <HTMLFlipBook
             ref={bookRef}
-            width={680}
-            height={962}
+            width={620}
+            height={877}
             size="stretch"
             minWidth={140}
-            maxWidth={900}
+            maxWidth={820}
             minHeight={200}
-            maxHeight={1270}
+            maxHeight={1160}
             drawShadow={!reducedMotion}
             flippingTime={reducedMotion ? 300 : 900}
             usePortrait={false}

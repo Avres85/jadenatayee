@@ -87,25 +87,18 @@ a {
 }
 
 .flipbook-shell {
-  width: 100%;
-  max-width: 1500px;
+  width: min(96vw, 1500px);
   height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   touch-action: none;
   user-select: none;
-  --book-desktop-scale: 1;
-  --book-shift-x: 0px;
-  --book-shift-y: 0px;
-  transform: translate(var(--book-shift-x), var(--book-shift-y)) scale(var(--book-desktop-scale));
-  transform-origin: center center;
   transition: transform 240ms ease;
 }
 
 .flipbook-shell.front-cover-centered {
-  transform: translate(calc(var(--book-shift-x) - 20%), var(--book-shift-y))
-    scale(var(--book-desktop-scale));
+  transform: translateX(-20%);
 }
 
 .flipbook-shell.front-cover-centered .stf__wrapper.--landscape,
@@ -125,9 +118,7 @@ a {
 
 @media (min-width: 1024px) {
   .flipbook-shell {
-    --book-desktop-scale: 0.62;
-    --book-shift-x: 2vw;
-    --book-shift-y: -3vh;
+    margin-top: -28px;
   }
 }
 
