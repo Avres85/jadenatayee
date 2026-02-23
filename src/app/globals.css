@@ -39,8 +39,11 @@ a {
 }
 
 .viewer-shell {
-  height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .toolbar {
@@ -74,8 +77,8 @@ a {
 }
 
 .viewer-stage {
-  min-height: calc(100vh - 64px);
-  height: calc(100vh - 64px);
+  flex: 1;
+  min-height: 0;
   background: #000;
   display: grid;
   place-items: center;
@@ -85,6 +88,7 @@ a {
 
 .flipbook-shell {
   width: min(96vw, 1500px);
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -144,6 +148,17 @@ a {
   -webkit-transform-style: preserve-3d;
   opacity: 1;
   overflow: hidden;
+}
+
+.flipbook-page.double-sided-cover .cover-texture {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  transform: translateZ(0.12px);
+  -webkit-transform: translateZ(0.12px);
 }
 
 .flipbook-page.double-sided-cover .cover-side-front {

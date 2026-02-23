@@ -118,15 +118,22 @@ function PageCanvas({
   pdf,
   pageNumber,
   zoom,
+  onBitmap,
 }: {
   pdf: PDFDocumentLike;
   pageNumber: number;
   zoom: number;
+  onBitmap?: (dataUrl: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const activeRenderTaskRef = useRef<{ cancel: () => void; promise: Promise<void> } | null>(null);
   const renderVersionRef = useRef(0);
+  const onBitmapRef = useRef(onBitmap);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onBitmapRef.current = onBitmap;
+  }, [onBitmap]);
 
   useEffect(() => {
     let disposed = false;
@@ -165,6 +172,9 @@ function PageCanvas({
         await localRenderTask.promise;
         if (activeRenderTaskRef.current === localRenderTask) {
           activeRenderTaskRef.current = null;
+        }
+        if (onBitmapRef.current) {
+          onBitmapRef.current(canvas.toDataURL("image/png"));
         }
       } catch (reason) {
         if (disposed || renderVersion !== renderVersionRef.current) return;
@@ -207,16 +217,35 @@ const FlipPage = forwardRef<
     zoom: number;
     className?: string;
     doubleSided?: boolean;
+    isFrontCover?: boolean;
+    coverTexture?: string | null;
+    onCoverBitmap?: (dataUrl: string) => void;
   }
->(function FlipPage({ pdf, pageNumber, zoom, className, doubleSided = false }, ref) {
+>(function FlipPage(
+  { pdf, pageNumber, zoom, className, doubleSided = false, isFrontCover = false, coverTexture, onCoverBitmap },
+  ref,
+) {
   if (doubleSided) {
     return (
       <div ref={ref} className={`flipbook-page double-sided-cover${className ? ` ${className}` : ""}`}>
         <div className="cover-side cover-side-front">
-          <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
+          {isFrontCover && coverTexture ? (
+            <img src={coverTexture} alt="" aria-hidden="true" className="cover-texture" draggable={false} />
+          ) : (
+            <PageCanvas
+              pdf={pdf}
+              pageNumber={pageNumber}
+              zoom={zoom}
+              onBitmap={isFrontCover ? onCoverBitmap : undefined}
+            />
+          )}
         </div>
         <div className="cover-side cover-side-back" aria-hidden="true">
-          <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
+          {isFrontCover && coverTexture ? (
+            <img src={coverTexture} alt="" aria-hidden="true" className="cover-texture" draggable={false} />
+          ) : (
+            <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
+          )}
         </div>
       </div>
     );
@@ -238,6 +267,7 @@ export function FlipbookViewer() {
   const [jumpValue, setJumpValue] = useState("1");
   const [zoom, setZoom] = useState(1);
   const [bookMode, setBookMode] = useState<BookMode>("landscape");
+  const [frontCoverTexture, setFrontCoverTexture] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const pdfJsRef = useRef<PdfJsModuleLike | null>(null);
   const bookRef = useRef<FlipBookRefLike | null>(null);
@@ -306,6 +336,7 @@ export function FlipbookViewer() {
           }
           return loaded;
         });
+        setFrontCoverTexture(null);
         resetFlipState();
         setCurrentPage(1);
         setJumpValue("1");
@@ -338,6 +369,10 @@ export function FlipbookViewer() {
     }
     setCurrentPage(nextPage);
     setJumpValue(String(nextPage));
+  }, []);
+
+  const setCoverTexture = useCallback((dataUrl: string) => {
+    setFrontCoverTexture((current) => (current === dataUrl ? current : dataUrl));
   }, []);
 
   const onBookInit = useCallback((event: { data?: { page?: number; mode?: BookMode } }) => {
@@ -443,7 +478,7 @@ export function FlipbookViewer() {
   }
 
   const gestureHandlers = useFlipGestures({
-    enabled: !flipSnapshot.locked,
+    enabled: !flipSnapshot.locked && (currentPage !== 1 || frontCoverTexture !== null),
     getEngine: () => bookRef.current?.pageFlip?.() ?? null,
     onNavigate: (intent) => {
       if (intent === "next") {
@@ -559,13 +594,13 @@ export function FlipbookViewer() {
         >
           <HTMLFlipBook
             ref={bookRef}
-            width={720}
-            height={1018}
+            width={680}
+            height={962}
             size="stretch"
             minWidth={260}
-            maxWidth={980}
+            maxWidth={900}
             minHeight={360}
-            maxHeight={1385}
+            maxHeight={1270}
             drawShadow={!reducedMotion}
             flippingTime={reducedMotion ? 300 : 900}
             usePortrait
@@ -596,6 +631,9 @@ export function FlipbookViewer() {
                 zoom={zoom}
                 className={page === 1 || page === allPages.length ? "cover-face" : undefined}
                 doubleSided={page === 1 || page === allPages.length}
+                isFrontCover={page === 1}
+                coverTexture={page === 1 ? frontCoverTexture : null}
+                onCoverBitmap={page === 1 ? setCoverTexture : undefined}
               />
             ))}
           </HTMLFlipBook>
