@@ -108,6 +108,22 @@ function usePrefersReducedMotion(): boolean {
   return value;
 }
 
+function useIsDesktop(breakpoint = 1024): boolean {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const query = `(min-width: ${breakpoint}px)`;
+    const media = window.matchMedia(query);
+    const sync = () => setIsDesktop(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, [breakpoint]);
+
+  return isDesktop;
+}
+
 function bytesToLabel(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -269,6 +285,7 @@ export function FlipbookViewer() {
   const [bookMode, setBookMode] = useState<BookMode>("landscape");
   const [frontCoverTexture, setFrontCoverTexture] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
+  const isDesktop = useIsDesktop(1024);
   const pdfJsRef = useRef<PdfJsModuleLike | null>(null);
   const bookRef = useRef<FlipBookRefLike | null>(null);
   const { snapshot: flipSnapshot, reset: resetFlipState, handleEngineState, requestProgrammaticTurn } =
@@ -549,6 +566,10 @@ export function FlipbookViewer() {
   const coverReadyForTurn = currentPage !== 1 || frontCoverTexture !== null;
   const canGoPrev = !flipSnapshot.locked && currentPage > 1;
   const canGoNext = !flipSnapshot.locked && currentPage < pdfDoc.numPages && coverReadyForTurn;
+  const bookWidth = isDesktop ? 420 : 620;
+  const bookHeight = isDesktop ? 594 : 877;
+  const bookMaxWidth = isDesktop ? 560 : 820;
+  const bookMaxHeight = isDesktop ? 790 : 1160;
 
   return (
     <main className="page-shell viewer-shell">
@@ -597,13 +618,13 @@ export function FlipbookViewer() {
         >
           <HTMLFlipBook
             ref={bookRef}
-            width={620}
-            height={877}
+            width={bookWidth}
+            height={bookHeight}
             size="stretch"
             minWidth={140}
-            maxWidth={820}
+            maxWidth={bookMaxWidth}
             minHeight={200}
-            maxHeight={1160}
+            maxHeight={bookMaxHeight}
             drawShadow={!reducedMotion}
             flippingTime={reducedMotion ? 300 : 900}
             usePortrait={false}
