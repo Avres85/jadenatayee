@@ -597,13 +597,13 @@ export function FlipbookViewer() {
             width={680}
             height={962}
             size="stretch"
-            minWidth={260}
+            minWidth={140}
             maxWidth={900}
-            minHeight={360}
+            minHeight={200}
             maxHeight={1270}
             drawShadow={!reducedMotion}
             flippingTime={reducedMotion ? 300 : 900}
-            usePortrait
+            usePortrait={false}
             startPage={0}
             startZIndex={1}
             autoSize
