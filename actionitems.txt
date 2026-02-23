@@ -70,7 +70,7 @@ Ticket FB-003 (Day 2): Replace fake CSS flip
 - Done when:
   - Page turn is realistic and drag-reactive.
 
-Ticket FB-004 (Day 2): Grab + drag + drop thresholds
+Ticket FB-004 (Day 2): Grab + drag + drop thresholds [Completed on February 22, 2026]
 - Files: `src/components/viewer/flip/useFlipGestures.ts`, `src/components/viewer/flip/flipRules.ts`
 - Tasks:
   - Corner grab zones.

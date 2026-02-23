@@ -3,6 +3,7 @@
 import HTMLFlipBook from "react-pageflip";
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EngineFlipState } from "@/components/viewer/flip/types";
+import { useFlipGestures } from "@/components/viewer/flip/useFlipGestures";
 import { useFlipState } from "@/components/viewer/flip/useFlipState";
 
 interface ViewerDocumentPayload {
@@ -28,11 +29,33 @@ interface PdfJsModuleLike {
 }
 
 type BookMode = "portrait" | "landscape";
+type PageDensity = "soft" | "hard";
+
+interface FlipBookPage {
+  setDensity: (density: PageDensity) => void;
+}
 
 interface PageFlipApi {
   flipNext: (corner?: "top" | "bottom") => void;
   flipPrev: (corner?: "top" | "bottom") => void;
   flip: (pageNumber: number, corner?: "top" | "bottom") => void;
+  turnToPage: (pageNumber: number) => void;
+  getCurrentPageIndex: () => number;
+  getPageCount: () => number;
+  getPage: (pageNumber: number) => FlipBookPage;
+  getBoundsRect: () => {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    pageWidth: number;
+  };
+  startUserTouch: (pos: { x: number; y: number }) => void;
+  userMove: (pos: { x: number; y: number }, isTouch: boolean) => void;
+  userStop: (pos: { x: number; y: number }, isSwipe?: boolean) => void;
+  getUI: () => {
+    getDistElement: () => HTMLElement;
+  };
 }
 
 interface FlipBookRefLike {
@@ -182,10 +205,25 @@ const FlipPage = forwardRef<
     pdf: PDFDocumentLike;
     pageNumber: number;
     zoom: number;
+    className?: string;
+    doubleSided?: boolean;
   }
->(function FlipPage({ pdf, pageNumber, zoom }, ref) {
+>(function FlipPage({ pdf, pageNumber, zoom, className, doubleSided = false }, ref) {
+  if (doubleSided) {
+    return (
+      <div ref={ref} className={`flipbook-page double-sided-cover${className ? ` ${className}` : ""}`}>
+        <div className="cover-side cover-side-front">
+          <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
+        </div>
+        <div className="cover-side cover-side-back" aria-hidden="true">
+          <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div ref={ref} className="flipbook-page">
+    <div ref={ref} className={`flipbook-page${className ? ` ${className}` : ""}`}>
       <PageCanvas pdf={pdf} pageNumber={pageNumber} zoom={zoom} />
     </div>
   );
@@ -205,6 +243,27 @@ export function FlipbookViewer() {
   const bookRef = useRef<FlipBookRefLike | null>(null);
   const { snapshot: flipSnapshot, reset: resetFlipState, handleEngineState, requestProgrammaticTurn } =
     useFlipState();
+
+  const ensureHardBoundaryCovers = useCallback(() => {
+    const pageFlip = bookRef.current?.pageFlip?.();
+    if (!pageFlip) return;
+    const pageCount = pageFlip.getPageCount();
+    if (pageCount <= 0) return;
+
+    try {
+      pageFlip.getPage(0).setDensity("hard");
+    } catch {
+      // no-op guard for transient engine state
+    }
+
+    if (pageCount > 1) {
+      try {
+        pageFlip.getPage(pageCount - 1).setDensity("hard");
+      } catch {
+        // no-op guard for transient engine state
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -282,6 +341,8 @@ export function FlipbookViewer() {
   }, []);
 
   const onBookInit = useCallback((event: { data?: { page?: number; mode?: BookMode } }) => {
+    ensureHardBoundaryCovers();
+
     resetFlipState();
     const pageIndex = Number(event?.data?.page ?? 0);
     const nextPage = Number.isFinite(pageIndex) ? pageIndex + 1 : 1;
@@ -290,7 +351,7 @@ export function FlipbookViewer() {
     if (event?.data?.mode) {
       setBookMode(event.data.mode);
     }
-  }, [resetFlipState]);
+  }, [ensureHardBoundaryCovers, resetFlipState]);
 
   const onChangeOrientation = useCallback((event: { data?: BookMode }) => {
     if (event?.data === "portrait" || event?.data === "landscape") {
@@ -327,6 +388,16 @@ export function FlipbookViewer() {
 
   function goNext(): void {
     if (!pdfDoc) return;
+    const pageFlip = bookRef.current?.pageFlip?.();
+    if (pageFlip) {
+      const index = pageFlip.getCurrentPageIndex();
+      const pageCount = pageFlip.getPageCount();
+      if (index >= pageCount - 1) {
+        return;
+      }
+    } else if (currentPage >= pdfDoc.numPages) {
+      return;
+    }
     requestBookTurn(
       (pageFlip) => pageFlip.flipNext("top"),
       () => {
@@ -339,6 +410,14 @@ export function FlipbookViewer() {
 
   function goPrev(): void {
     if (!pdfDoc) return;
+    const pageFlip = bookRef.current?.pageFlip?.();
+    if (pageFlip) {
+      if (pageFlip.getCurrentPageIndex() <= 0) {
+        return;
+      }
+    } else if (currentPage <= 1) {
+      return;
+    }
     requestBookTurn(
       (pageFlip) => pageFlip.flipPrev("top"),
       () => {
@@ -363,6 +442,38 @@ export function FlipbookViewer() {
     );
   }
 
+  const gestureHandlers = useFlipGestures({
+    enabled: !flipSnapshot.locked,
+    getEngine: () => bookRef.current?.pageFlip?.() ?? null,
+    onNavigate: (intent) => {
+      if (intent === "next") {
+        goNext();
+        return;
+      }
+      goPrev();
+    },
+  });
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+    };
+  }, []);
+
   async function toggleFullscreen(): Promise<void> {
     if (typeof document === "undefined") return;
     if (document.fullscreenElement) {
@@ -374,7 +485,7 @@ export function FlipbookViewer() {
 
   if (loading) {
     return (
-      <main className="page-shell">
+      <main className="page-shell viewer-shell">
         <div className="panel mono">Loading portfolio...</div>
       </main>
     );
@@ -382,7 +493,7 @@ export function FlipbookViewer() {
 
   if (error) {
     return (
-      <main className="page-shell">
+      <main className="page-shell viewer-shell">
         <div className="panel danger mono">{error}</div>
       </main>
     );
@@ -390,19 +501,24 @@ export function FlipbookViewer() {
 
   if (!pdfDoc || !meta) {
     return (
-      <main className="page-shell">
+      <main className="page-shell viewer-shell">
         <div className="panel mono">No portfolio available.</div>
       </main>
     );
   }
 
+  const isFrontCoverCentered =
+    bookMode === "landscape" && currentPage === 1 && flipSnapshot.phase === "idle";
+  const canGoPrev = !flipSnapshot.locked && currentPage > 1;
+  const canGoNext = !flipSnapshot.locked && currentPage < pdfDoc.numPages;
+
   return (
-    <main className="page-shell">
+    <main className="page-shell viewer-shell">
       <div className="toolbar">
-        <button type="button" onClick={goPrev} disabled={flipSnapshot.locked}>
+        <button type="button" onClick={goPrev} disabled={!canGoPrev}>
           Prev
         </button>
-        <button type="button" onClick={goNext} disabled={flipSnapshot.locked}>
+        <button type="button" onClick={goNext} disabled={!canGoNext}>
           Next
         </button>
         <input
@@ -437,7 +553,10 @@ export function FlipbookViewer() {
       </div>
 
       <section className="viewer-stage" aria-live="polite">
-        <div className="flipbook-shell">
+        <div
+          className={`flipbook-shell${isFrontCoverCentered ? " front-cover-centered" : ""}`}
+          {...gestureHandlers}
+        >
           <HTMLFlipBook
             ref={bookRef}
             width={720}
@@ -454,13 +573,13 @@ export function FlipbookViewer() {
             startZIndex={1}
             autoSize
             maxShadowOpacity={0.35}
-            showCover={false}
+            showCover
             mobileScrollSupport
             clickEventForward
-            useMouseEvents
+            useMouseEvents={false}
             swipeDistance={30}
-            showPageCorners
-            disableFlipByClick={false}
+            showPageCorners={false}
+            disableFlipByClick
             className="flipbook"
             style={{}}
             renderOnlyPageLengthChange
@@ -470,7 +589,14 @@ export function FlipbookViewer() {
             onChangeState={onChangeState}
           >
             {allPages.map((page) => (
-              <FlipPage key={page} pdf={pdfDoc} pageNumber={page} zoom={zoom} />
+              <FlipPage
+                key={page}
+                pdf={pdfDoc}
+                pageNumber={page}
+                zoom={zoom}
+                className={page === 1 || page === allPages.length ? "cover-face" : undefined}
+                doubleSided={page === 1 || page === allPages.length}
+              />
             ))}
           </HTMLFlipBook>
         </div>

@@ -38,6 +38,11 @@ a {
   color: var(--ink);
 }
 
+.viewer-shell {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -70,10 +75,12 @@ a {
 
 .viewer-stage {
   min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
   background: #000;
   display: grid;
   place-items: center;
   padding: 1rem;
+  overflow: hidden;
 }
 
 .flipbook-shell {
@@ -81,6 +88,24 @@ a {
   display: flex;
   justify-content: center;
   align-items: center;
+  touch-action: none;
+  user-select: none;
+  transition: transform 240ms ease;
+}
+
+.flipbook-shell.front-cover-centered {
+  transform: translateX(-25%);
+}
+
+.flipbook-shell.front-cover-centered .stf__wrapper.--landscape,
+.flipbook-shell.front-cover-centered .stf__block {
+  overflow: hidden;
+}
+
+/* In landscape cover-open state, only expose the right half (the cover page). */
+.flipbook-shell.front-cover-centered .stf__block {
+  clip-path: inset(0 0 0 50%);
+  -webkit-clip-path: inset(0 0 0 50%);
 }
 
 .flipbook {
@@ -92,6 +117,55 @@ a {
   height: 100%;
   background: #fff;
   display: flex;
+}
+
+/* Keep hard cover container visible while it rotates. */
+.flipbook-shell .stf__item.--hard.cover-face {
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.flipbook-page.double-sided-cover {
+  position: relative;
+  display: block;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.flipbook-page.double-sided-cover .cover-side {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  opacity: 1;
+  overflow: hidden;
+}
+
+.flipbook-page.double-sided-cover .cover-side-front {
+  transform: translateZ(0.12px);
+}
+
+.flipbook-page.double-sided-cover .cover-side-back {
+  transform: rotateY(180deg) translateZ(0.12px);
+  pointer-events: none;
+}
+
+.flipbook-page.double-sided-cover .cover-side .page-canvas-wrap,
+.flipbook-page.double-sided-cover .cover-side .page-canvas {
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  transform: translateZ(0.12px);
+  -webkit-transform: translateZ(0.12px);
+}
+
+.flipbook-page.double-sided-cover .cover-side .page-canvas-wrap {
+  position: relative;
+  z-index: 2;
 }
 
 .page-canvas-wrap {

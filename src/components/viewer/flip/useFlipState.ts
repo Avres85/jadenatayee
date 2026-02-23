@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EngineFlipState, FlipPhase, FlipStateSnapshot } from "./types";
 
 type DeferredTurn = () => void;
@@ -14,25 +14,46 @@ export function useFlipState(): UseFlipStateResult {
   const [phase, setPhase] = useState<FlipPhase>("idle");
   const [locked, setLocked] = useState(false);
   const pendingTurnRef = useRef<DeferredTurn | null>(null);
+  const lockTimeoutRef = useRef<number | null>(null);
+
+  const clearLockTimeout = useCallback(() => {
+    if (lockTimeoutRef.current !== null) {
+      window.clearTimeout(lockTimeoutRef.current);
+      lockTimeoutRef.current = null;
+    }
+  }, []);
+
+  const armLockTimeout = useCallback(() => {
+    clearLockTimeout();
+    lockTimeoutRef.current = window.setTimeout(() => {
+      pendingTurnRef.current = null;
+      setPhase("idle");
+      setLocked(false);
+      lockTimeoutRef.current = null;
+    }, 1800);
+  }, [clearLockTimeout]);
 
   const reset = useCallback(() => {
     pendingTurnRef.current = null;
+    clearLockTimeout();
     setPhase("idle");
     setLocked(false);
-  }, []);
+  }, [clearLockTimeout]);
 
   const runTurn = useCallback((turn: DeferredTurn) => {
     try {
       setPhase("flipping");
       setLocked(true);
+      armLockTimeout();
       turn();
       return true;
     } catch {
+      clearLockTimeout();
       setPhase("idle");
       setLocked(false);
       return false;
     }
-  }, []);
+  }, [armLockTimeout, clearLockTimeout]);
 
   const requestProgrammaticTurn = useCallback(
     (turn: DeferredTurn) => {
@@ -55,15 +76,18 @@ export function useFlipState(): UseFlipStateResult {
       if (state === "user_fold") {
         setPhase("dragging");
         setLocked(true);
+        armLockTimeout();
         return;
       }
 
       if (state === "flipping") {
         setPhase("flipping");
         setLocked(true);
+        armLockTimeout();
         return;
       }
 
+      clearLockTimeout();
       const pending = pendingTurnRef.current;
       pendingTurnRef.current = null;
       if (pending) {
@@ -73,8 +97,14 @@ export function useFlipState(): UseFlipStateResult {
       setPhase("idle");
       setLocked(false);
     },
-    [runTurn],
+    [armLockTimeout, clearLockTimeout, runTurn],
   );
+
+  useEffect(() => {
+    return () => {
+      clearLockTimeout();
+    };
+  }, [clearLockTimeout]);
 
   return {
     snapshot: {
