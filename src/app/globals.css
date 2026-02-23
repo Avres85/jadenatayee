@@ -94,11 +94,14 @@ a {
   align-items: center;
   touch-action: none;
   user-select: none;
+  --book-desktop-scale: 1;
+  transform: scale(var(--book-desktop-scale));
+  transform-origin: center center;
   transition: transform 240ms ease;
 }
 
 .flipbook-shell.front-cover-centered {
-  transform: translateX(-25%);
+  transform: translateX(-25%) scale(var(--book-desktop-scale));
 }
 
 .flipbook-shell.front-cover-centered .stf__wrapper.--landscape,
@@ -114,6 +117,12 @@ a {
 
 .flipbook {
   margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .flipbook-shell {
+    --book-desktop-scale: 0.7;
+  }
 }
 
 .flipbook-page {
